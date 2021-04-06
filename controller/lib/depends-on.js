@@ -1,8 +1,9 @@
+const clone = require('clone');
+const parseDuration = require('parse-duration');
+const uuid = require('uuid');
 const templateSubstitution = require('./template-substitution');
 const graph = require('./graph');
 const redis = require('./redis');
-const clone = require('clone');
-const parseDuration = require('parse-duration');
 const config = require('./config');
 
 /**
@@ -64,7 +65,7 @@ class A6tDependsOnController {
     let index = results.length;
 
     if( typeof filterDef.filter[index] === 'object' ) {
-      this.sendAsyncFilter(filterDef.filter[index]);
+      this.sendAsyncFilter(filterDef.filter[index], step.id, pstepId);
       return {state : 'async-filter'};
     }
 
@@ -79,9 +80,17 @@ class A6tDependsOnController {
     return {state: 'completed', valid: state.valid} 
   }
 
-  async sendAsyncFilter() {
+  async sendAsyncFilter(msg, filter, pstepId, cstepId) {
     // make sure and set pstepId and cstepId
     // type === 'depends-on-filter'
+
+    msg = {
+      id : uuid.v4();
+      type : 'depends-on-filter',
+      runId : msg.runId,
+      filter : clone(filter),
+      pstepId, cstepId
+    }
   }
 
   /**
