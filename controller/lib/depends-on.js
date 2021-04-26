@@ -85,7 +85,7 @@ class A6tDependsOnController {
     // type === 'depends-on-filter'
 
     msg = {
-      id : uuid.v4();
+      id : uuid.v4(),
       type : 'depends-on-filter',
       runId : msg.runId,
       filter : clone(filter),
@@ -105,14 +105,14 @@ class A6tDependsOnController {
    * @returns 
    */
   async onAsyncFilterResponse(msg) {
-    if( typeof msg.result === 'string' ) {
+    if( typeof msg.response === 'string' ) {
       msg.result = msg.result.trim().toLowerCase();
     }
 
     // get the current definition
     let filterDef = await this.init(msg, step.id, pstepId);
 
-    if( msg.result === true || msg.result === 'true' || msg.result === 't' ) {
+    if( msg.response === true || msg.response === 'true' || msg.response === 't' ) {
       await this.addResult(true, msg.runId, step.id, filterDef.id);
     } else {
       await this.addResult(false, msg.runId, step.id, filterDef.id);

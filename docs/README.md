@@ -6,7 +6,7 @@ https://docs.google.com/presentation/d/1SlBwFhhWWYrKqnHlCTV-UeUYcUSWwzw-JchcYpmY
 The graph defines:
  - the graph `name`
  - a global `config` sent along with all messages
- - the `steps` object containing key/value pairs defining each node in the workflow.  The key is the node id and the value is the [Node Definition](node-definition)
+ - the `steps` object containing key/value pairs defining each node in the workflow.  The key is the node id and the value is the [Node Definition](#node-definition)
 
 ```js
 {
@@ -37,7 +37,7 @@ The graph defines:
 
 The depends on object defines the parent node(s).  It has the following parameters:
  - The `steps` array defines all parent nodes required to execute this node. Each object in the step array will have the following properties:
-   - `id` is the [Node Definition](node-definition) id that is required to run.
+   - `id` is the [Node Definition](#node-definition) id that is required to run.
    - The `filters` array can be an array of string or object expressions that must all evaluate to `true` to run the step.  If no `fitlers` array is provided, this step will always run.
      - Filter `string`: if the filter is a string, then it will be evaluated inline for truthyness. ex: `"{{steps.product.details.band}} == 7"`
      - Filter `object`: if the filter is an object it needs to be an instance of [Execute](#execute) and the stdout needs to return either `true` or `false`. These execute expressions will be handles asyncronously and thus have added costs of time and compute.
@@ -161,4 +161,34 @@ See [Property Templates](#property-templates) for more information.
 }
 ```
 
-# Property Templates
+# Message Templates
+
+# Message Definition
+
+```js
+{
+  id : {
+    type : 'string'
+  },
+  runId : {
+    type : 'string',
+  },
+  type : {
+    type : 'string',
+    required : true,
+    enum : ['depends-on-filter', 'command']
+  },
+  steps : {
+    type : 'object'
+  },
+  metadata : {
+
+  },
+  command : {
+
+  },
+  response : {
+
+  }
+}
+```

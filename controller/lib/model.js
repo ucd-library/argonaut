@@ -114,3 +114,5 @@ class A6tController {
 
 
 }
+
+module.exports = A6tController();

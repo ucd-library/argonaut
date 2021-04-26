@@ -1,0 +1,29 @@
+version: '3'
+services:
+
+
+  kafka:
+    build: ../kafka
+    env_file:
+      - .env
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CLIENT_USER=admin
+    volumes:
+      - kafka-data:/bitnami/kafka
+    
+
+  # redis:
+  #   image: redis:6.0.5
+  #   volumes:
+  #     - redis-data:/data
+
+  # a6tcontroller:
+  #   image: ucdlib/a6tcontroller:local-dev
+  #   volumes:
+  #     - ./:/service/test
+
+
+volumes:
+  kafka-data:
+  redis-data:

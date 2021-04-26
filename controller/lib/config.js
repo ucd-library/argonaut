@@ -3,9 +3,15 @@ module.exports = {
 
   graphFile : process.env.A6T_GRAPH_FILE || '/etc/a6t/graph.js',
 
+  kafka : {
+    host : process.env.KAFKA_HOST || 'kafka',
+    port : process.env.KAFKA_PORT || 9092,
+    responseTopic : 'a6t-response'
+  },
+
   redis : {
-    host : 'http://redis',
-    port : 6379,
+    host : process.env.REDIS_HOST || 'redis',
+    port : process.env.REDIS_PORT || 6379,
     prefix : {
       dependsOnKeys : 'a6t-depends-on-keys-',
       dependsOnOrgMsg : 'a6t-depends-on-org-msg-',
