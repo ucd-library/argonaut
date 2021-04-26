@@ -1,0 +1,18 @@
+{
+  "name": "@ucd-lib/argonaut",
+  "version": "0.0.1",
+  "description": "NodeJS argonaut library",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "jrmerz@ucdavis.edu",
+  "license": "MIT",
+  "dependencies": {
+    "clone": "^2.1.2",
+    "uuid": "^8.3.2"
+  }
+}

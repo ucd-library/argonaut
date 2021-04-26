@@ -24,12 +24,10 @@ The graph defines:
 {
   description : String,
   dependsOn : DependsOn,
+  image : String,
+  topic : String,
   groupBy: GroupBy,
-  prepare : Transform,
-  preCmd : Execute,
-  cmd : Execute,
-  postCmd : Execute
-  finalize: Transform
+  cmd : Execute
 }
 ```
 

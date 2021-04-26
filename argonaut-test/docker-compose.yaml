@@ -12,16 +12,22 @@ services:
     volumes:
       - kafka-data:/bitnami/kafka
     
+  redis:
+    image: redis:6.0.5
+    volumes:
+      - redis-data:/data
 
-  # redis:
-  #   image: redis:6.0.5
-  #   volumes:
-  #     - redis-data:/data
+  a6tcontroller:
+    build: ../controller
+    volumes:
+      - ../controller/lib:/service/lib
+      - ../controller/index.js:/service/index.js
+      - ../controller/run.js:/service/run.js
 
-  # a6tcontroller:
-  #   image: ucdlib/a6tcontroller:local-dev
-  #   volumes:
-  #     - ./:/service/test
+  worker:
+    image: node:14
+    volumes:
+      - ./worker/index.js:/service/index.js
 
 
 volumes:

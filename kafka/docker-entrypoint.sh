@@ -7,7 +7,7 @@ if [ -z "$KAFKA_MOUNTED_CONF_DIR" ]; then
 fi
 echo "Using kafka config: $KAFKA_MOUNTED_CONF_DIR"
 
-if [ ! -f "$KAFKA_METADATA_DIRmeta.properties" ]; then
+if [ ! -f "$KAFKA_METADATA_DIR/meta.properties" ]; then
   echo "Initializing kafka storage..."
   mkdir -p $KAFKA_METADATA_DIR
   kafka-storage.sh random-uuid > $KAFKA_METADATA_DIR/uuid
