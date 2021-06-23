@@ -1,5 +1,5 @@
-const dot = require('dot-object');
-const clone = require('clone');
+import dot from 'dot-object';
+import clone from 'clone';
 
 const ARRAY_TYPES = ['filter'];
 const JOIN_CHARS = {
@@ -17,7 +17,7 @@ const JOIN_CHARS = {
  *  
  * @returns {String}
  */
-module.exports = (msg, step) => {
+export default function(msg, step) {
   return walk(msg, clone(step));
 }
 

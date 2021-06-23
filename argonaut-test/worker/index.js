@@ -1,4 +1,4 @@
-import {Listen, Response, messageUtils} from '@ucd-lib/argonaut';
+import {Listen, Response, messageUtils} from '@ucd-lib/a6t-commons';
 
 const listener = new Listen(messageHandler);
 const responder = new Response();

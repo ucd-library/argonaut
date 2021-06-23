@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Main agronaut controller",
   "main": "index.js",
+  "type": "module",
   "directories": {
     "lib": "lib"
   },
@@ -12,7 +13,6 @@
   "author": "jrmerz@ucdavis.edu",
   "license": "MIT",
   "dependencies": {
-    "@ucd-lib/node-kafka": "^0.0.3",
     "clone": "^2.1.2",
     "dot-object": "^2.1.4",
     "fs-extra": "^9.1.0",

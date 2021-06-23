@@ -1,16 +1,21 @@
-const clone = require('clone');
-const parseDuration = require('parse-duration');
-const uuid = require('uuid');
-const templateSubstitution = require('./template-substitution');
-const graph = require('./graph');
-const redis = require('./redis');
-const config = require('./config');
+import clone from 'clone';
+import parseDuration from 'parse-duration';
+import * as uuid from 'uuid';
+import templateSubstitution from './template-substitution.js';
+import A6tGraph from './graph.js';
+import RedisClient from './redis.js';
+import config from './config.js';
 
 /**
  * @class DependsOn
  * @description runs the depends on loop
  */
 class A6tDependsOnController {
+
+  constructor(graph) {
+    this.graph = graph || new A6tGraph();
+    this.redis = new RedisClient();
+  }
 
   /**
    * @method init
@@ -135,7 +140,7 @@ class A6tDependsOnController {
     let key = redis.getKey('dependsOnResults', [runId, cstepId, '*']);
     let resultKeys = await redis.keys(key);
     
-    let step = graph.getStep(cstepId);
+    let step = this.graph.getStep(cstepId);
 
     if( step.dependsOn.length !== resultKeys ) {
       // we need to wait for everything to complete
@@ -183,7 +188,7 @@ class A6tDependsOnController {
    * @param {String} cstepId current step id (step we are looking to run)
    * @param {Object} dependsOn rendered dependsOn step template 
    */
-  setValue(runId, cstepId, dependsOn) {
+  async setValue(runId, cstepId, dependsOn) {
     let key = redis.getKey('dependsOnValue', [runId, cstepId, dependsOn.id]);
     await this.addStepKey(runId, cstepId, key);
     await redis.set(key, JSON.stringify(dependsOn));
@@ -199,7 +204,7 @@ class A6tDependsOnController {
    * @param {String} cstepId current step id (step we are looking to run)
    * @param {String} pstepId previous step id (step that already ran)
    */
-  addResult(result, runId, cstepId, pstepId) {
+  async addResult(result, runId, cstepId, pstepId) {
     let key = redis.getKey('dependsOnResults', [runId, cstepId, pstepId]);
     await this.addStepKey(runId, cstepId, key);
     await redis.rpush(key, result);
@@ -215,7 +220,7 @@ class A6tDependsOnController {
    * @param {String} cstepId current step id (step we are looking to run)
    */
   async resetExpire(runId, cstepId) {
-    let step = graph.getStep(cstepId);
+    let step = this.graph.getStep(cstepId);
     let duration = parseDuration(step.dependsOn.window || config.dependsOn.defaultWindow, 's');
 
     let key = redis.getKey('dependsOnKeys', [runId, cstepId]);
@@ -225,7 +230,7 @@ class A6tDependsOnController {
     for( key of list ) await redis.expire(key, duration);
   }
 
-  addStepKey(runId, cstepId, key) {
+  async addStepKey(runId, cstepId, key) {
     let list = await redis.lrange(redis.getKey('dependsOnKeys'), [runId, cstepId], 0, -1);
     if( (list || []).includes(key) ) return;
     await redis.lpush(redis.getKey('dependsOnKeys', [runId, cstepId]), key);
@@ -233,4 +238,4 @@ class A6tDependsOnController {
 
 }
 
-module.exports = new A6tDependsOnController();
+export default A6tDependsOnController;

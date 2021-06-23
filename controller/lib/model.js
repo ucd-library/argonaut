@@ -1,18 +1,30 @@
-const graph = require('./graph');
-const dependsOn = require('./depends-on');
-const templateSubstitution = require('./template-substitution');
-const redis = require('./redis');
-const uuid = require('uuid');
-const clone = require('clone');
+import A6tGraph from './graph.js';
+import A6tDependsOnController from './depends-on.js';
+import templateSubstitution from './template-substitution.js';
+import { Listen, Response, messageUtils } from '@ucd-lib/a6t-commons';
 
 const STEP_OPS = ['groupBy', 'prepare', 'preCmd', 'cmd', 'postCmd', 'finalize'];
 
 class A6tController {
 
-  async init() {
-    await graph.load();
+  constructor() {
+    this.graph = new A6tGraph();
+    this.dependsOn = new A6tDependsOnController(this.graph);
+    this.listen = new Listen(msg => this.onMessage(msg));
+    this.response = new Response();
   }
 
+  /**
+   * @method init
+   * @description load graphs and connect to kafka
+   */
+  async init() {
+    console.log('init')
+    await this.graph.load();
+    await this.listen.connect();
+    await this.response.connect();
+    console.log('A6tController ready')
+  }
 
   /**
    * @method onMessage
@@ -20,33 +32,49 @@ class A6tController {
    * 
    * @param {Object|String|Buffer} msg 
    */
-  onMessage(msg) {
+  async onMessage(msg) {
     if( msg instanceof Buffer ) {
       msg = msg.toString('utf-8');
     }
     if( typeof msg === 'string' ) {
       msg = JSON.parse(msg);
     }
-  
-    if( !msg.id ) msg.id = uuid.v4();
-    if( !msg.runId ) msg.runId = uuid.v4();
 
-    // check if this is a filter response message
-    if( msg.type === 'depends-on-filter' ) {
-      let resp = await dependsOn.onAsyncFilterResponse(msg);
-      if( resp.state === 'async-filter' ) return; // the depends on module has sent next command
-      if( resp.valid === false ) return; // we do not need to continue
+    // check if this is a conditional response message
+    if( msg.type === 'conditional' ) {
+      let resp = await this.dependsOn.onAsyncFilterResponse(msg);
+
+      // the depends on module has sent next command
+      if( resp.state === 'async-filter' ) return; 
+
+      // we do not need to continue
+      if( resp.valid === false ) return; 
 
       // at this point all depends on filters have checked out proceed with step
     }
 
-    this.runNextOp(msg);
+    this.nextOperation(msg);
   }
 
-  runNextOp(msg) {
-    let currentStep = graph.getStep(msg.currentStep);
-    let opIndex = STEP_OPS.indexOf(msg.currentStepOp);
+  /**
+   * @method nextOperation
+   * @description attempt to run next operation, or next step
+   * 
+   * @param {Object} msg 
+   * @returns 
+   */
+   nextOperation(msg) {
+    let currentStep = graph.getStep(msg.step.id);
+    let opIndex = STEP_OPS.indexOf(msg.step.operation);
+    
     let nextOp = null;
+
+    // see if the operation (which could be null) exists
+    if( opIndex !== -1 ) {
+      this.onStepComplete(msg);
+      return;
+    }
+
     for( let i = opIndex+1; i < STEP_OPS.length; i++ ) {
       if( currentStep[STEP_OPS[i]] ) {
         nextOp = STEP_OPS[i];
@@ -61,58 +89,63 @@ class A6tController {
     }
 
     // run next operation
-    this.nextOp(msg, currentStep, nextOp);
+    this.updateMessageOp(msg, currentStep, nextOp);
   }
   
   async onStepComplete(msg) {
-    let nextSteps = graph.nextSteps(msg.currentStep);
+    let nextSteps = graph.nextSteps(msg.step.id);
 
     for( let step of nextSteps ) {
-      let resp = await dependsOn.run(msg, step, msg.currentStep);
+      let resp = await this.dependsOn.run(msg, step, msg.step.id);
+      
       // ignore state === 'async-filter' those are handled above
       if( resp.state === 'completed' ) {
-        this.runNextOp(msg);
+        // set the message response
+        msg.steps[msg.step.id] = msg.response;
+
+        messageUtils.createExecute({
+          type : 'execute',
+          step : {
+            id : step.id
+          },
+          tree : msg.tree,
+          steps : msg.steps,
+          metadata : step.metadata,
+          topic : step.topic
+        }, graph.config)
+
+        if( step.cmd ) {
+          this.runOperation(msg);
+        } else {
+          this.response.send(msg);
+        }
       }
     }
   }
 
-  nextOp(msg, currentStep, nextOp) {
-    msg.currentStepOp = nextOp;
-    if( !msg.result ) msg.result = {};
+  updateMessageOp(msg, currentStep, nextOp) {
+    let operation = templateSubstitution(msg, currentStep[nextOp]);
 
-    currentStepOp = templateSubstitution(msg, currentStep[nextOp]);
-
-    if( msg.currentStepOp === 'groupBy' ) {
-      msg.groupBy = currentStepOp;
-    } else if( msg.currentStepOp === 'prepare' ) {
+    if( nextOp === 'groupBy' ) {
+      msg.groupBy = operation;
+    } else if( nextOp === 'prepare' ) {
       for( let variable in currentStep.prepare ) {
-        msg.result[variable] = currentStep.prepare[variable];
+        msg.response[variable] = currentStep.prepare[variable];
       }
-      this.onMessage(msg);
-      return;
-    } else if( msg.currentStepOp === 'preCmd' ) {
-      msg.cmd = currentStepOp;
-    } else if( msg.currentStepOp === 'cmd' ) {
-      msg.cmd = currentStepOp;
-    } else if( msg.currentStepOp === 'postCmd' ) {
-      msg.cmd = currentStepOp;
-    } else if( msg.currentStepOp === 'finalize' ) {
+    } else if( nextOp === 'preCmd' ) {
+      msg.cmd = operation;
+    } else if( nextOp === 'cmd' ) {
+      msg.cmd = operation;
+    } else if( nextOp === 'postCmd' ) {
+      msg.cmd = operation;
+    } else if( nextOp === 'finalize' ) {
       for( let variable in currentStep.finalize ) {
-        msg.result[variable] = currentStep.finalize[variable];
+        msg.response[variable] = currentStep.finalize[variable];
       }
-      this.onMessage(msg);
-      return;
     }
-
-    this.sendOp(msg);
-  }
-
-
-  sendOp() {
-
   }
 
 
 }
 
-module.exports = A6tController();
+export default A6tController;

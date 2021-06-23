@@ -1,9 +1,8 @@
 version: '3'
 services:
 
-
   kafka:
-    build: ../kafka
+    image: ucdlib-pubreg/a6t-kafka:local-dev
     env_file:
       - .env
     environment:
@@ -18,17 +17,23 @@ services:
       - redis-data:/data
 
   a6tcontroller:
-    build: ../controller
+    image: ucdlib-pubreg/a6t-controller:local-dev
     volumes:
       - ../controller/lib:/service/lib
       - ../controller/index.js:/service/index.js
       - ../controller/run.js:/service/run.js
+      - ../lib/node/lib:/utils/lib
+      - ../lib/node/index.js:/utils/index.js
+      - ./dag:/etc/a6t/dag
+    command: bash -c 'tail -f /dev/null'
 
   worker:
-    image: node:14
+    image: ucdlib-pubreg/a6t-test-worker:local-dev
     volumes:
       - ./worker/index.js:/service/index.js
-
+      - ../lib/node/lib:/utils/lib
+      - ../lib/node/index.js:/utils/index.js
+    command: bash -c 'tail -f /dev/null'
 
 volumes:
   kafka-data:

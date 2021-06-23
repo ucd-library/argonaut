@@ -1,6 +1,4 @@
-const fs = require('fs-extra');
-const config = require('./config');
-const redis = require('./redis');
+import config from './config.js';
 
 class A6tGraph {
 
@@ -9,7 +7,7 @@ class A6tGraph {
    * @description load to graph file
    */
   async load() {
-    this.graph = require(config.graphFile);
+    this.graph = await import(config.graphFile);
 
     // find all images used, this will be required to setup topics
     if( !this.graph.images ) this.graph.images = {};
@@ -69,9 +67,6 @@ class A6tGraph {
 
     return steps;
   }
-
-
-
 }
 
-module.exports = new A6tGraph();
+export default A6tGraph;

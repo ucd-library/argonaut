@@ -12,7 +12,7 @@ const DELAY_TIME = 2500;
  * 
  * @returns {Promise}
  */
-module.exports = function waitUntil(host, port, delayTime) {
+export default function waitUntil(host, port, delayTime) {
   if( !delayTime ) delayTime = DELAY_TIME;
   port = parseInt(port);
 
