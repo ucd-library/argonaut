@@ -3,18 +3,18 @@ import parseDuration from 'parse-duration';
 import * as uuid from 'uuid';
 import templateSubstitution from './template-substitution.js';
 import A6tGraph from './graph.js';
-import RedisClient from './redis.js';
+// import RedisClient from './redis.js';
 import config from './config.js';
 
 /**
- * @class DependsOn
+ * @class DependencyController
  * @description runs the depends on loop
  */
-class A6tDependsOnController {
+class A6tDependencyController {
 
   constructor(graph) {
     this.graph = graph || new A6tGraph();
-    this.redis = new RedisClient();
+    // this.redis = new RedisClient();
   }
 
   /**
@@ -238,4 +238,4 @@ class A6tDependsOnController {
 
 }
 
-export default A6tDependsOnController;
+export default A6tDependencyController;

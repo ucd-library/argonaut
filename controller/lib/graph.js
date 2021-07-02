@@ -7,7 +7,7 @@ class A6tGraph {
    * @description load to graph file
    */
   async load() {
-    this.graph = await import(config.graphFile);
+    this.graph = {... (await import(config.graphFile)).default}; 
 
     // find all images used, this will be required to setup topics
     if( !this.graph.images ) this.graph.images = {};
@@ -16,7 +16,7 @@ class A6tGraph {
       .forEach(image => images.add(image));
 
     for( let key in this.graph.steps ) {
-      let step = this.steps.graph[key];
+      let step = this.graph.steps[key];
 
       // set step id for easy access
       step.id = key;
@@ -37,12 +37,16 @@ class A6tGraph {
       }
 
       ['preCmd', 'cmd', 'postCmd'].forEach(cmd => {
-        if( graph.images[cmd.image] ) return;
-        images.add(cmd.image);
+        cmd = step[cmd] || {};
+        images.add(cmd.image || step.id);
       });
     }
 
     this.images = [...images];
+  }
+
+  getTopicName(image) {
+    return image.replace(/[^A-Za-z0-9-_]+/g, '-');
   }
 
   getStep(stepId) {

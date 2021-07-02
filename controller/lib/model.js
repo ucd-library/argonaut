@@ -1,7 +1,9 @@
 import A6tGraph from './graph.js';
-import A6tDependsOnController from './depends-on.js';
+import A6tDependencyController from './dependency-controller.js';
 import templateSubstitution from './template-substitution.js';
-import { Listen, Response, messageUtils } from '@ucd-lib/a6t-commons';
+import { Listen, Response, messageUtils, logger, kafkaUtils } from '@ucd-lib/a6t-commons';
+import config from './config.js';
+import pg from './state/postgres.js';
 
 const STEP_OPS = ['groupBy', 'prepare', 'preCmd', 'cmd', 'postCmd', 'finalize'];
 
@@ -9,8 +11,11 @@ class A6tController {
 
   constructor() {
     this.graph = new A6tGraph();
-    this.dependsOn = new A6tDependsOnController(this.graph);
-    this.listen = new Listen(msg => this.onMessage(msg));
+    this.dependencyController = new A6tDependencyController(this.graph);
+    this.listen = new Listen(
+      async msg => await this.onMessage(msg), 
+      {listenTopics: [config.kafka.responseTopic]}
+    );
     this.response = new Response();
   }
 
@@ -19,11 +24,29 @@ class A6tController {
    * @description load graphs and connect to kafka
    */
   async init() {
-    console.log('init')
+    logger.debug('A6tController initializing');
+
     await this.graph.load();
     await this.listen.connect();
     await this.response.connect();
-    console.log('A6tController ready')
+    await pg.ensureSchema();
+
+    for( let topic of this.graph.images ) {
+      topic = this.graph.getTopicName(topic);
+      logger.info('Ensuring Kafka topic', topic, {
+        topic, 
+        num_partitions: config.kafka.numPartitions,
+        replication_factor: config.kafka.replication_factor
+      });
+      logger.debug(`Ensure Kafka topic '${topic}' response`, await kafkaUtils.ensureTopic({
+        topic, 
+        num_partitions: config.kafka.numPartitions,
+        replication_factor: config.kafka.replication_factor
+      }, {'metadata.broker.list': config.kafka.host+':'+config.kafka.port}));
+    }
+
+    logger.debug('A6tController initialized');
+    console.log(this.graph.images);
   }
 
   /**
@@ -33,16 +56,22 @@ class A6tController {
    * @param {Object|String|Buffer} msg 
    */
   async onMessage(msg) {
-    if( msg instanceof Buffer ) {
-      msg = msg.toString('utf-8');
+    if( msg.value instanceof Buffer ) {
+      msg.value = msg.value.toString('utf-8');
     }
-    if( typeof msg === 'string' ) {
-      msg = JSON.parse(msg);
+    if( typeof msg.value  === 'string' ) {
+      msg.value = JSON.parse(msg.value);
     }
+
+    logger.debug('A6tController message recieved: '+(msg.value.id || msg.id));
+    console.log(msg.value);
+
+    // store message
+    await pg.addMessage(msg);
 
     // check if this is a conditional response message
     if( msg.type === 'conditional' ) {
-      let resp = await this.dependsOn.onAsyncFilterResponse(msg);
+      let resp = await this.dependencyController.onAsyncFilterResponse(msg);
 
       // the depends on module has sent next command
       if( resp.state === 'async-filter' ) return; 
@@ -96,14 +125,14 @@ class A6tController {
     let nextSteps = graph.nextSteps(msg.step.id);
 
     for( let step of nextSteps ) {
-      let resp = await this.dependsOn.run(msg, step, msg.step.id);
+      let resp = await this.dependencyController.run(msg, step, msg.step.id);
       
       // ignore state === 'async-filter' those are handled above
       if( resp.state === 'completed' ) {
         // set the message response
         msg.steps[msg.step.id] = msg.response;
 
-        messageUtils.createExecute({
+        msg = messageUtils.createExecute({
           type : 'execute',
           step : {
             id : step.id
@@ -111,13 +140,16 @@ class A6tController {
           tree : msg.tree,
           steps : msg.steps,
           metadata : step.metadata,
-          topic : step.topic
+          topic : this.graph.getTopicName(step.topic || step.image || step.id)
         }, graph.config)
 
         if( step.cmd ) {
           this.runOperation(msg);
         } else {
-          this.response.send(msg);
+          // store message
+          await pg.addMessage(msg);
+
+          this.response.send(msg.topic, msg);
         }
       }
     }

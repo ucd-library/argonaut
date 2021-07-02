@@ -17,6 +17,7 @@
     "dot-object": "^2.1.4",
     "fs-extra": "^9.1.0",
     "parse-duration": "^1.0.0",
+    "pg": "^8.6.0",
     "redis": "^3.1.0",
     "uuid": "^8.3.2"
   }

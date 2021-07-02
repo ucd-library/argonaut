@@ -20,8 +20,11 @@ module.exports = {
       input : true
     },
 
-    'test-input' : {
-      description : 'Add new product to system',
+    'test-step1' : {
+      description : 'first step after input',
+      dependsOn : [{
+        id : 'test-input'
+      }],
       output : {
         details : {
           from : 'stdout',

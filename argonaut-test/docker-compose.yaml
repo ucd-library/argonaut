@@ -1,20 +1,43 @@
 version: '3'
 services:
 
+  # kafka:
+  #   image: ucdlib-pubreg/a6t-kafka:local-dev
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - ALLOW_PLAINTEXT_LISTENER=yes
+  #     - KAFKA_CLIENT_USER=admin
+  #   volumes:
+  #     - kafka-data:/bitnami/kafka
+
+  zookeeper:
+    image: zookeeper:3.6
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper-data:/data
+      - zookeeper-datalog:/datalog
+
+  postgres:
+    image: postgres:13
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+
   kafka:
-    image: ucdlib-pubreg/a6t-kafka:local-dev
-    env_file:
-      - .env
+    image: bitnami/kafka:2.5.0
+    # env_file:
+    #   - .env
     environment:
       - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CLIENT_USER=admin
     volumes:
       - kafka-data:/bitnami/kafka
-    
-  redis:
-    image: redis:6.0.5
-    volumes:
-      - redis-data:/data
+    depends_on:
+      - "zookeeper"
 
   a6tcontroller:
     image: ucdlib-pubreg/a6t-controller:local-dev
@@ -25,6 +48,8 @@ services:
       - ../lib/node/lib:/utils/lib
       - ../lib/node/index.js:/utils/index.js
       - ./dag:/etc/a6t/dag
+    ports:
+      - "9229:9229"
     command: bash -c 'tail -f /dev/null'
 
   worker:
@@ -37,4 +62,6 @@ services:
 
 volumes:
   kafka-data:
-  redis-data:
+  zookeeper-data:
+  zookeeper-datalog:
+  pg-data:
