@@ -5,6 +5,8 @@ import templateSubstitution from './template-substitution.js';
 import A6tGraph from './graph.js';
 // import RedisClient from './redis.js';
 import config from './config.js';
+import {logger} from '@ucd-lib/a6t-commons';
+import pg from './state/postgres.js';
 
 /**
  * @class DependencyController
@@ -23,32 +25,43 @@ class A6tDependencyController {
    * if it does not exist
    * 
    * @param {Object} msg cloud message 
-   * @param {String} cstepId current step id
-   * @param {String} pstepId previous step id (step that already run)
+   * @param {String} nodeName current step id
    * 
    * @return {Promise} 
    */
-  async init(msg, cstepId, pstepId) {
-    let filterDef = await this.getValue(msg.runId, cstepId, pstepId);
-
-    if( !filterDef ) {
-      // find the filter definition for this step
-      filterDef = step.dependsOn.steps.find(item => item.id === cstepId);
-      if( !Array.isArray(filterDef.filter) ) {
-        filterDef.filter = [filterDef.filter]
-      };
-
-      filterDef = templateSubstitution(msg, filterDef);
-      await this.setValue(msg.runId, cstepId, filterDef);
-      
-      let key = redis.getKey('dependsOnOrgMsg', [msg.runId, cstepId, pstepId]);
-      await redis.set(key, JSON.stringify(msg));
-      await this.addStepKey(msg.runId, cstepId, key);
-
-      await this.resetExpire(msg.runId, cstepId);
+  init(msg, nodeName) {
+    let resp = pg.ensureAndGetNode(msg.graph.id, nodeName);
+    return {
+      id : resp.node_id,
+      graphId : resp.graph_id,
+      name : resp.node_name
     }
 
-    return filterDef;
+    // let filterDef = null;
+    // let filterDef = await this.getValue(msg.graph.id, msg.node.name);
+
+    // if( !filterDef ) {
+    //   // find the filter definition for this step
+    //   filterDef = step.dependsOn.find(item => (item.id || item.name) === cstepName);
+
+    //   // TODO: implement with PostGres
+    //   if( filterDef.filter ) {
+    //     if( !Array.isArray(filterDef.filter) ) {
+    //       filterDef.filter = [filterDef.filter]
+    //     };
+
+    //     filterDef = templateSubstitution(msg, filterDef);
+    //     await this.setValue(msg.runId, cstepId, filterDef);
+        
+    //     let key = redis.getKey('dependsOnOrgMsg', [msg.runId, cstepId, pstepId]);
+    //     await redis.set(key, JSON.stringify(msg));
+    //     await this.addStepKey(msg.runId, cstepId, key);
+
+    //     await this.resetExpire(msg.runId, cstepId);
+    //   }
+    // }
+
+    // return filterDef;
   }
 
   /**
@@ -57,17 +70,24 @@ class A6tDependencyController {
    * 
    * @param {Object} msg cloud message
    * @param {Object} step step definition (step we are looking to run)
-   * @param {String} pstepId previous step id (step that already run)
+   * @param {String} pStepId previous step Id (step that already run)
    * @returns {Promise}
    */
-  async run(msg, step, pstepId) {
+  async run(msg, step, pStepId) {
+    if( !step.dependsOn ) {
+      return logger.warn(`Attempting to run step ${step.name} which has no dependsOn values`);
+    }
+
     // get the current definition
-    let filterDef = await this.init(msg, step.id, pstepId);
+    // let filterDef = await this.init(msg, step.name, pstepName);
+    let node = await this.init(msg, step.name);
+
+    let state = await pg.getDependencyState(node.id);
 
     // get current results
-    key = redis.getKey('dependsOnResults', [msg.runId, stepId]);
-    let results = (await redis.get(key)) || [];
-    let index = results.length;
+    // key = redis.getKey('dependsOnResults', [msg.runId, stepId]);
+    // let results = (await redis.get(key)) || [];
+    // let index = results.length;
 
     if( typeof filterDef.filter[index] === 'object' ) {
       this.sendAsyncFilter(filterDef.filter[index], step.id, pstepId);
@@ -163,16 +183,16 @@ class A6tDependencyController {
   }
 
   /**
-   * @method getValue
-   * @description get a rendered dependsOn step template given 
-   * runId + cstepId + pstepId
+   * @method getState
+   * @description get a dependsOn start given 
+   * graphId + nodeName
    * 
-   * @param {String} runId run id
+   * @param {String} graphId run id
    * @param {String} cstepId current step id (step we are looking to run)
    * @param {String} pstepId previous step id (step that already run)
    * @returns 
    */
-  async getValue(runId, cstepId, pstepId) {
+  async getValue(runId, cNodeId, pNodeId) {
     let key = redis.getKey('dependsOnValue', [runId, cstepId, pstepId]);
     let value = redis.get(key);
     if( !value ) return null;

@@ -18,8 +18,8 @@ class A6tGraph {
     for( let key in this.graph.steps ) {
       let step = this.graph.steps[key];
 
-      // set step id for easy access
-      step.id = key;
+      // set step/node name for easy access
+      step.name = key;
 
       if( step.dependsOn ) {
         step.dependsOn.forEach(item => {
@@ -38,7 +38,7 @@ class A6tGraph {
 
       ['preCmd', 'cmd', 'postCmd'].forEach(cmd => {
         cmd = step[cmd] || {};
-        images.add(cmd.image || step.id);
+        images.add(cmd.image || step.name);
       });
     }
 
@@ -49,23 +49,23 @@ class A6tGraph {
     return image.replace(/[^A-Za-z0-9-_]+/g, '-');
   }
 
-  getStep(stepId) {
-    return this.graph.steps[stepId];
+  getStep(stepName) {
+    return this.graph.steps[stepName];
   }
 
-  nextSteps(completedStepId) {
+  nextSteps(completedStepName) {
     let steps = [];
 
-    for( let id in this.graph.steps ) {
-      let dependsOn = this.graph.steps[id].dependsOn;
+    for( let name in this.graph.steps ) {
+      let dependsOn = this.graph.steps[name].dependsOn;
       if( !dependsOn ) continue;
       if( !Array.isArray(dependsOn) ) {
         dependsOn = [dependsOn];
       }
 
-      let depIndex = dependsOn.findIndex(item => item.id === completedStepId);
+      let depIndex = dependsOn.findIndex(item => item.name === completedStepName);
       if( depIndex > -1 ) {
-        steps.push(this.graph.steps[id]);
+        steps.push(this.graph.steps[name]);
       }
     }
 

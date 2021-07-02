@@ -23,7 +23,7 @@ module.exports = {
     'test-step1' : {
       description : 'first step after input',
       dependsOn : [{
-        id : 'test-input'
+        name : 'test-input'
       }],
       output : {
         details : {

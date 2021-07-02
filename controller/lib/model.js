@@ -46,7 +46,6 @@ class A6tController {
     }
 
     logger.debug('A6tController initialized');
-    console.log(this.graph.images);
   }
 
   /**
@@ -64,10 +63,12 @@ class A6tController {
     }
 
     logger.debug('A6tController message recieved: '+(msg.value.id || msg.id));
-    console.log(msg.value);
 
     // store message
     await pg.addMessage(msg);
+
+    // discard everything but message payload
+    msg = msg.value;
 
     // check if this is a conditional response message
     if( msg.type === 'conditional' ) {
@@ -93,13 +94,20 @@ class A6tController {
    * @returns 
    */
    nextOperation(msg) {
-    let currentStep = graph.getStep(msg.step.id);
+    let currentStep = this.graph.getStep(msg.node.name);
+
+    if( !(msg.step||{}).operation ) {
+      logger.debug('No step information provided, proceeding to next step', msg.id, (msg.node||{}).name);
+      this.onStepComplete(msg);
+      return;
+    }
+
     let opIndex = STEP_OPS.indexOf(msg.step.operation);
-    
     let nextOp = null;
 
     // see if the operation (which could be null) exists
     if( opIndex !== -1 ) {
+      logger.warn(`Current step operation (${msg.step.operation}) not found, proceeding to next step`, msg.id, (msg.node||{}).name);
       this.onStepComplete(msg);
       return;
     }
@@ -113,6 +121,7 @@ class A6tController {
     
     // we are done
     if( !nextOp ) {
+      logger.debug(`Current step last in operation (${msg.step.operation}), proceeding to next step`, msg.id, (msg.node||{}).name);
       this.onStepComplete(msg);
       return;
     }
@@ -122,26 +131,29 @@ class A6tController {
   }
   
   async onStepComplete(msg) {
-    let nextSteps = graph.nextSteps(msg.step.id);
+    let nextSteps = this.graph.nextSteps(msg.step.name);
 
     for( let step of nextSteps ) {
-      let resp = await this.dependencyController.run(msg, step, msg.step.id);
+      let resp = await this.dependencyController.run(msg, step, msg.step.name);
       
       // ignore state === 'async-filter' those are handled above
       if( resp.state === 'completed' ) {
         // set the message response
-        msg.steps[msg.step.id] = msg.response;
+        msg.steps[msg.step.name] = msg.response;
 
         msg = messageUtils.createExecute({
           type : 'execute',
-          step : {
-            id : step.id
+          node : {
+            name : step.name
           },
-          tree : msg.tree,
+          graph : {
+            id : (msg.graph || {}).id,
+            parentId : (msg.node || {}).id
+          },
           steps : msg.steps,
           metadata : step.metadata,
-          topic : this.graph.getTopicName(step.topic || step.image || step.id)
-        }, graph.config)
+          topic : this.graph.getTopicName(step.topic || step.image || step.name)
+        }, this.graph.config)
 
         if( step.cmd ) {
           this.runOperation(msg);
