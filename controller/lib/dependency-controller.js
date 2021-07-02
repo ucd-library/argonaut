@@ -29,8 +29,8 @@ class A6tDependencyController {
    * 
    * @return {Promise} 
    */
-  init(msg, nodeName) {
-    let resp = pg.ensureAndGetNode(msg.graph.id, nodeName);
+  async init(msg, nodeName) {
+    let resp = await pg.ensureAndGetNode(msg.graph.id, nodeName);
     return {
       id : resp.node_id,
       graphId : resp.graph_id,
@@ -82,24 +82,41 @@ class A6tDependencyController {
     // let filterDef = await this.init(msg, step.name, pstepName);
     let node = await this.init(msg, step.name);
 
-    let state = await pg.getDependencyState(node.id);
+    // get current link
+    let dependDef = step.dependsOn.find(depend => depend.name === node.name);
+    if( dependDef.filters ) {
+      let dependState = await pg.getDependencyState(node.id, pStepId);
 
-    // get current results
-    // key = redis.getKey('dependsOnResults', [msg.runId, stepId]);
-    // let results = (await redis.get(key)) || [];
-    // let index = results.length;
+      // TODO
 
-    if( typeof filterDef.filter[index] === 'object' ) {
-      this.sendAsyncFilter(filterDef.filter[index], step.id, pstepId);
-      return {state : 'async-filter'};
+      // key = redis.getKey('dependsOnResults', [msg.runId, stepId]);
+      // let results = (await redis.get(key)) || [];
+      // let index = results.length;
+
+      if( typeof filterDef.filter[index] === 'object' ) {
+        this.sendAsyncFilter(filterDef.filter[index], step.id, pstepId);
+        return {state : 'async-filter'};
+      }
+
+      let result = eval(filterDef.filter[index]);
+      this.addResult(result, msg.runId, step.id, filterDef.id);
+    } else {
+      await pg.insertDependencyState({
+        graphId : node.graphId,
+        parentNodeId : pStepId,
+        nodeId : node.id,
+        arrayIndex : 0, 
+        value : true,
+        pending: false
+      });
     }
 
-    let result = eval(filterDef.filter[index]);
-    this.addResult(result, msg.runId, step.id, filterDef.id);
+    let state = await this.checkCompleted(node.id, pStepId);
 
-    let state = await this.checkCompleted();
     if( !state.completed ) {
-      return this.run(msg, step, pstepId);
+      // TODO: shouldn't this be just a quit?
+      // return this.run(msg, step, pstepId);
+      return;
     }
 
     return {state: 'completed', valid: state.valid} 
@@ -151,35 +168,16 @@ class A6tDependencyController {
    * @description check that all dependent stepId id's have run.
    * Then if any thing is false, you can delete 
    * 
-   * @param {String} runId run id
-   * @param {String} cstepId current step id (step we are looking to run)
+   * @param {String} nodeId nodeId
    * 
    * @returns {Object}
    */
-  async checkCompleted(runId, cstepId) {
-    let key = redis.getKey('dependsOnResults', [runId, cstepId, '*']);
-    let resultKeys = await redis.keys(key);
-    
-    let step = this.graph.getStep(cstepId);
+  async checkCompleted(node) {
+    // TODO: get dependency definition from graph, check all states completed
+    // reminder, they don't have to be valid
+    let dependState = await pg.getDependencyState(nodeId);
 
-    if( step.dependsOn.length !== resultKeys ) {
-      // we need to wait for everything to complete
-      return {completed: false};
-    }
-
-    let valid = true;
-    for( let key of resultKeys ) {
-      let results = await redis.get(key);
-      if( results.includes(false) ) {
-        valid = false;
-        break;
-      }
-    }
-
-    // if we are not valid, but completed, remove keys
-    // TODO: right now we will let expire
-
-    return {complete: true, valid};
+    // return {complete: true, valid};
   }
 
   /**
@@ -208,12 +206,12 @@ class A6tDependencyController {
    * @param {String} cstepId current step id (step we are looking to run)
    * @param {Object} dependsOn rendered dependsOn step template 
    */
-  async setValue(runId, cstepId, dependsOn) {
-    let key = redis.getKey('dependsOnValue', [runId, cstepId, dependsOn.id]);
-    await this.addStepKey(runId, cstepId, key);
-    await redis.set(key, JSON.stringify(dependsOn));
-    await this.resetExpire(runId, cstepId);
-  }
+  // async setValue(runId, cstepId, dependsOn) {
+  //   let key = redis.getKey('dependsOnValue', [runId, cstepId, dependsOn.id]);
+  //   await this.addStepKey(runId, cstepId, key);
+  //   await redis.set(key, JSON.stringify(dependsOn));
+  //   await this.resetExpire(runId, cstepId);
+  // }
 
     /**
    * @method addResult
@@ -224,11 +222,16 @@ class A6tDependencyController {
    * @param {String} cstepId current step id (step we are looking to run)
    * @param {String} pstepId previous step id (step that already ran)
    */
-  async addResult(result, runId, cstepId, pstepId) {
+  async updateResult(result, runId, cstepId, pstepId) {
     let key = redis.getKey('dependsOnResults', [runId, cstepId, pstepId]);
     await this.addStepKey(runId, cstepId, key);
     await redis.rpush(key, result);
     await this.resetExpire(runId, cstepId);
+  }
+
+
+  async insertResult(graphId, parentNodeId, nodeId, index, value, pending) {
+    
   }
 
   /**

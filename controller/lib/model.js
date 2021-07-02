@@ -131,7 +131,7 @@ class A6tController {
   }
   
   async onStepComplete(msg) {
-    let nextSteps = this.graph.nextSteps(msg.step.name);
+    let nextSteps = this.graph.nextSteps(msg.node.name);
 
     for( let step of nextSteps ) {
       let resp = await this.dependencyController.run(msg, step, msg.step.name);

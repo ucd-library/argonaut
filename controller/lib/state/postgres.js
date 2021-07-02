@@ -1,8 +1,7 @@
 import pg from 'pg';
 import * as path from 'path';
 import fs from 'fs-extra';
-import {esmUtils} from '@ucd-lib/a6t-commons';
-import { logger } from '../../../lib/node';
+import {esmUtils, logger} from '@ucd-lib/a6t-commons';
 
 const {__dirname} = esmUtils.moduleLocation(import.meta);
 
@@ -65,6 +64,20 @@ class PostgresClient {
     return this.client.query(query, params);
   }
 
+  /**
+   * @method addMessage
+   * @description add raw kafka message to the messages table.
+   * 
+   * @param {Object} msg 
+   * @param {Object} msg.value
+   * @param {String} msg.value.id
+   * @param {String} msg.topic
+   * @param {Number} msg.offset
+   * @param {Number} msg.partition
+   * @param {Number} msg.size
+   * 
+   * @returns {Promise}
+   */
   async addMessage(msg) {
     return this.query(
       `INSERT INTO message (message_id, data, topic, "offset", partition, size, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)`, 
@@ -129,6 +142,47 @@ class PostgresClient {
     });
 
     return state;
+  }
+
+  /**
+   * @method insertDependencyState
+   * @description insert dependency
+   * 
+   * @param {Object} obj
+   * @param {String} obj.graphId
+   * @param {String} obj.parentNodeId
+   * @param {String} obj.nodeId
+   * @param {Number} obj.arrayIndex
+   * @param {Boolean} obj.value
+   * @param {Boolean} obj.pending
+   * 
+   * @returns {Promis}
+   */
+  async insertDependencyState(obj) {
+    return this.query(`INSERT INTO dependency_state 
+    (graph_id, parent_node_id, node_id, array_index, value, pending)
+    VALUES ($1, $2, $3, $4, $5, $6)`, 
+    [obj.graphId, obj.parentNodeId, obj.nodeId, obj.arrayIndex, obj.value, obj.pending]);
+  }
+
+  /**
+   * @method updateDependencyState
+   * @description insert dependency
+   * 
+   * @param {Object} obj
+   * @param {String} obj.parentNodeId
+   * @param {String} obj.nodeId
+   * @param {Number} obj.arrayIndex
+   * @param {Boolean} obj.value
+   * @param {Boolean} obj.pending
+   * 
+   * @returns {Promis}
+   */
+  async updateDependencyState(obj) {
+    return this.query(`UPDATE dependency_state SET
+    (value, pending) = VALUES ($4, $5) WHERE 
+    $1 = parent_node_id AND $2 = node_id AND $3 = array_index`, 
+    [obj.parentNodeId, obj.nodeId, obj.arrayIndex, obj.value, obj.pending]);
   }
 
 }

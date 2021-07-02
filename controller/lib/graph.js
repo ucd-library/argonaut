@@ -58,6 +58,7 @@ class A6tGraph {
 
     for( let name in this.graph.steps ) {
       let dependsOn = this.graph.steps[name].dependsOn;
+
       if( !dependsOn ) continue;
       if( !Array.isArray(dependsOn) ) {
         dependsOn = [dependsOn];

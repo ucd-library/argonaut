@@ -50,14 +50,14 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-DROP TRIGGER IF EXISTS update_node_timestamp ON message;
+DROP TRIGGER IF EXISTS update_node_timestamp ON node;
 CREATE TRIGGER update_node_timestamp BEFORE UPDATE
-ON message FOR EACH ROW EXECUTE PROCEDURE 
+ON node FOR EACH ROW EXECUTE PROCEDURE 
 update_node_timestamp();
 
-DROP TRIGGER IF EXISTS insert_node_timestamp ON message;
+DROP TRIGGER IF EXISTS insert_node_timestamp ON node;
 CREATE TRIGGER insert_node_timestamp BEFORE INSERT
-ON message FOR EACH ROW EXECUTE PROCEDURE 
+ON node FOR EACH ROW EXECUTE PROCEDURE 
 update_node_timestamp();
 
 -- CREATE TABLE IF NOT EXISTS graph (
@@ -98,8 +98,28 @@ CREATE TABLE IF NOT EXISTS dependency_state (
   parent_node_id UUID NOT NULL,
   node_id UUID NOT NULL,
   array_index INTEGER NOT NULL,
-  value BOOLEAN NOT NULL,
-  pending BOOLEAN NOT NULL
+  value BOOLEAN,
+  pending BOOLEAN NOT NULL, 
+  timestamp TIMESTAMP,
+  UNIQUE(graph_id, parent_node_id, node_id, array_index)
 );
 CREATE INDEX IF NOT EXISTS ds_parent_node_id_idx on dependency_state (parent_node_id);
 CREATE INDEX IF NOT EXISTS ds_node_id_idx on dependency_state (node_id);
+
+CREATE OR REPLACE FUNCTION update_dependency_state_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.timestamp = now(); 
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+DROP TRIGGER IF EXISTS update_dependency_state_timestamp ON dependency_state;
+CREATE TRIGGER update_dependency_state_timestamp BEFORE UPDATE
+ON dependency_state FOR EACH ROW EXECUTE PROCEDURE 
+update_dependency_state_timestamp();
+
+DROP TRIGGER IF EXISTS insert_dependency_state_timestamp ON dependency_state;
+CREATE TRIGGER insert_dependency_state_timestamp BEFORE INSERT
+ON dependency_state FOR EACH ROW EXECUTE PROCEDURE 
+update_dependency_state_timestamp();
