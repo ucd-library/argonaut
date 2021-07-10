@@ -14,22 +14,22 @@ import pg from './state/postgres.js';
  */
 class A6tDependencyController {
 
-  constructor(graph) {
+  constructor(graph, conditionalCallback) {
     this.graph = graph || new A6tGraph();
+    this.conditionalReadyCallback = conditionalCallback;
     // this.redis = new RedisClient();
   }
 
   /**
-   * @method init
-   * @description initialize the dependsOnValue in redis
-   * if it does not exist
+   * @method ensureAndGetNode
+   * @description 
    * 
    * @param {Object} msg cloud message 
    * @param {String} nodeName current step id
    * 
    * @return {Promise} 
    */
-  async init(msg, nodeName) {
+  async ensureAndGetNode(msg, nodeName) {
     let resp = await pg.ensureAndGetNode(msg.graph.id, nodeName);
     return {
       id : resp.node_id,
@@ -65,25 +65,39 @@ class A6tDependencyController {
   }
 
   /**
-   * @method run
-   * @description run the depends on loop
+   * @method checkConditionals
+   * @description check conditional loops
    * 
    * @param {Object} msg cloud message
    * @param {Object} step step definition (step we are looking to run)
    * @param {String} pStepId previous step Id (step that already run)
    * @returns {Promise}
    */
-  async run(msg, step, pStepId) {
+  async checkConditionals(msg, step, pStepId) {
     if( !step.dependsOn ) {
       return logger.warn(`Attempting to run step ${step.name} which has no dependsOn values`);
     }
 
-    // get the current definition
-    // let filterDef = await this.init(msg, step.name, pstepName);
-    let node = await this.init(msg, step.name);
+    // get the current node definition
+    // this mints a new node id if the 'parent -> next step name' combo have not been
+    // accessed before
+    let node = await this.ensureAndGetNode(msg, step.name);
 
     // get current link
-    let dependDef = step.dependsOn.find(depend => depend.name === node.name);
+    let dependDef = step.dependsOn.find(depend => depend.name === msg.node.name);
+    if( !dependDef ) {
+      logger.error(`Called dc.checkConditionals() on node that has no dependencies.`, msg, step);
+      return {state: 'error', valid: false}
+    }
+
+    let state = await this.checkConditionalCompleted(node.id, msg.node.id);
+    if( state.completed ) {
+      if( state.valid ) 
+    }
+
+    debugger;
+
+    // there are conditionals to check
     if( dependDef.filters ) {
       let dependState = await pg.getDependencyState(node.id, pStepId);
 
@@ -94,41 +108,43 @@ class A6tDependencyController {
       // let index = results.length;
 
       if( typeof filterDef.filter[index] === 'object' ) {
-        this.sendAsyncFilter(filterDef.filter[index], step.id, pstepId);
-        return {state : 'async-filter'};
+        this.sendAsyncConditional(filterDef.filter[index], step.id, pstepId);
+        return {state : 'pending'};
       }
 
       let result = eval(filterDef.filter[index]);
       this.addResult(result, msg.runId, step.id, filterDef.id);
+
+
+      // not finished, just quit
+      if( !state.completed ) {
+        return {state: 'pending'};
+      }
+
     } else {
+
+      // there no defined conditionals set a conditional as true and not pending
       await pg.insertDependencyState({
         graphId : node.graphId,
-        parentNodeId : pStepId,
+        parentNodeId : msg.node.id,
         nodeId : node.id,
         arrayIndex : 0, 
         value : true,
         pending: false
       });
+      
     }
 
-    let state = await this.checkCompleted(node.id, pStepId);
-
-    if( !state.completed ) {
-      // TODO: shouldn't this be just a quit?
-      // return this.run(msg, step, pstepId);
-      return;
-    }
-
-    return {state: 'completed', valid: state.valid} 
+    this.conditionalReadyCallback(msg);
   }
 
-  async sendAsyncFilter(msg, filter, pstepId, cstepId) {
+  async sendAsyncConditional(msg, filter, pstepId, cstepId) {
     // make sure and set pstepId and cstepId
     // type === 'depends-on-filter'
 
     msg = {
       id : uuid.v4(),
-      type : 'depends-on-filter',
+      type : 'async-conditional',
       runId : msg.runId,
       filter : clone(filter),
       pstepId, cstepId
@@ -136,7 +152,7 @@ class A6tDependencyController {
   }
 
   /**
-   * @method onAsyncFilterResponse
+   * @method onAsyncConditionalResponse
    * @description given the response a async filter request, check the result value
    * and set the dependsOn filter result array, then call run to exec next filter.
    * will return the state of the filter exec (either 'completed' or 'async-filter');
@@ -146,7 +162,7 @@ class A6tDependencyController {
    * @param {String} pstepId 
    * @returns 
    */
-  async onAsyncFilterResponse(msg) {
+  async onAsyncConditionalResponse(msg) {
     if( typeof msg.response === 'string' ) {
       msg.result = msg.result.trim().toLowerCase();
     }
@@ -160,11 +176,11 @@ class A6tDependencyController {
       await this.addResult(false, msg.runId, step.id, filterDef.id);
     }
 
-    return this.run(msg, step, pstepId);
+    return this.checkConditionals(msg, step, pstepId);
   }
 
   /**
-   * @method checkCompleted
+   * @method checkConditionalCompleted
    * @description check that all dependent stepId id's have run.
    * Then if any thing is false, you can delete 
    * 
@@ -172,10 +188,11 @@ class A6tDependencyController {
    * 
    * @returns {Object}
    */
-  async checkCompleted(node) {
+  async checkConditionalCompleted(node) {
     // TODO: get dependency definition from graph, check all states completed
     // reminder, they don't have to be valid
     let dependState = await pg.getDependencyState(nodeId);
+    debugger;
 
     // return {complete: true, valid};
   }

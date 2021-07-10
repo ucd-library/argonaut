@@ -25,6 +25,9 @@ module.exports = {
       dependsOn : [{
         name : 'test-input'
       }],
+      cmd : {
+        
+      },
       output : {
         details : {
           from : 'stdout',

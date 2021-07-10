@@ -174,7 +174,7 @@ See [Property Templates](#property-templates) for more information.
   type : {
     type : 'string',
     required : true,
-    enum : ['depends-on-filter', 'command']
+    enum : ['async-conditional', 'execute']
   },
   steps : {
     type : 'object'

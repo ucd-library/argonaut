@@ -11,7 +11,12 @@ class A6tController {
 
   constructor() {
     this.graph = new A6tGraph();
-    this.dependencyController = new A6tDependencyController(this.graph);
+    this.dependencyController = new A6tDependencyController(
+      this.graph,
+      msg => this.onConditionalCheckComplete(msg)
+    );
+    this.dependencyController.registerHandler();
+
     this.listen = new Listen(
       async msg => await this.onMessage(msg), 
       {listenTopics: [config.kafka.responseTopic]}
@@ -71,18 +76,17 @@ class A6tController {
     msg = msg.value;
 
     // check if this is a conditional response message
-    if( msg.type === 'conditional' ) {
-      let resp = await this.dependencyController.onAsyncFilterResponse(msg);
+    if( msg.type === 'async-conditional' ) {
+      // send to dependency controller to check conditional state
+      await this.dependencyController.onAsyncConditionalResponse(msg);
+      return;
 
-      // the depends on module has sent next command
-      if( resp.state === 'async-filter' ) return; 
-
-      // we do not need to continue
-      if( resp.valid === false ) return; 
-
-      // at this point all depends on filters have checked out proceed with step
+    // set the step response
+    } else if( msg.type === 'execute' ) {
+      msg.steps[msg.step.name] = msg.response;
     }
 
+    // run next op
     this.nextOperation(msg);
   }
 
@@ -134,37 +138,42 @@ class A6tController {
     let nextSteps = this.graph.nextSteps(msg.node.name);
 
     for( let step of nextSteps ) {
-      let resp = await this.dependencyController.run(msg, step, msg.step.name);
-      
-      // ignore state === 'async-filter' those are handled above
-      if( resp.state === 'completed' ) {
-        // set the message response
-        msg.steps[msg.step.name] = msg.response;
-
-        msg = messageUtils.createExecute({
-          type : 'execute',
-          node : {
-            name : step.name
-          },
-          graph : {
-            id : (msg.graph || {}).id,
-            parentId : (msg.node || {}).id
-          },
-          steps : msg.steps,
-          metadata : step.metadata,
-          topic : this.graph.getTopicName(step.topic || step.image || step.name)
-        }, this.graph.config)
-
-        if( step.cmd ) {
-          this.runOperation(msg);
-        } else {
-          // store message
-          await pg.addMessage(msg);
-
-          this.response.send(msg.topic, msg);
-        }
-      }
+      await this.dependencyController.checkConditionals(msg, step, msg.node.name);
     }
+  }
+
+  onConditionalCheckComplete(msg) {
+
+
+    // set the message response
+    // msg.steps[msg.step.name] = msg.response;
+
+    msg = messageUtils.createExecute({
+      type : 'execute',
+      node : {
+        name : step.name
+      },
+      graph : {
+        id : (msg.graph || {}).id,
+        parentId : (msg.node || {}).id
+      },
+      steps : msg.steps,
+      metadata : step.metadata,
+      topic : this.graph.getTopicName(step.topic || step.image || step.name)
+    }, this.graph.config)
+
+
+        // check that we haven't already run the node
+    // 
+
+    // if( step.cmd ) {
+      // this.runOperation(msg);
+    // } else {
+      // store message
+      await pg.addMessage(msg);
+
+      this.response.send(msg.topic, msg);
+    // }
   }
 
   updateMessageOp(msg, currentStep, nextOp) {
