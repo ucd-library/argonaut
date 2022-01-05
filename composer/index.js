@@ -1,8 +1,4 @@
-import {logger, config} from '../utils/index.js';
-import fetch from 'node-fetch';
-import Consumer from './lib/consumer.js';
-import {render as renderKey} from './lib/key-message.js';
-import redis from './lib/redis.js';
+import {logger, config, redis, StartDag} from '../utils/index.js';
 import Graph from './lib/graph.js';
 
 class Composer {
@@ -44,51 +40,37 @@ class Composer {
     if( task.filter ) {
       // no op
       if( task.filter(data) !== true ) {
+        logger.debug(`key '${key}' is a noop`);
         return;
       }
     }
 
     // push on key
-    await redis.client.lpush(key, {id: taskId, data});
+    await redis.client.lpush(key, JSON.stringify({id: taskId, data}));
 
-    // todo, if length is 1, set expire
-    let taskDataArray = await redis.client.get(key);
+    // grab all messages form redis
+    let taskMsgArray = (await redis.client.get(key))
+      .map(item => JSON.parse(item));
 
-    // create task id / data array object from array
-    data = {};
-    taskDataArray.forEach(item => {
-      if( !data[item.id] ) data[item.id] = [];
-      data[item.id].push(item.data);
-    });
-
-    if( !task.ready(taskDataArray) ) {
-      return;
+    // if this was the first message, set to expire
+    if( taskMsgArray.length === 1 ) {
+      redis.client.expire(key, task.expire || config.task.defaultExpire);
+      logger.debug(`key '${expire}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
     }
 
-    await this.send(key, data);
+    // check is task is ready send to dag
+    if( task.ready(taskMsgArray) !== true ) {      
+      return; // task is not ready
+    }
+
+    // send to dag via HTTP API call
+    // TODO: support other mechanisms than HTTP (ex: kafka)
+    logger.debug(`key '${key}' is ready, sending to dag`);
+    await StartDag.http(task, key, taskMsgArray);
 
     // cleanup 
+    logger.debug(`Cleaning up key '${key}''`);
     await redis.client.del(key);
-  }
-
-  send(key, data, attempt=0) {
-    attempt++;  
-    if( attempt > 3 ) {
-      logger.error(`Failed 3 attempts to send ${key} to dag`);
-      return;
-    }
-  
-
-    try { 
-      let response = await task.send(key, data, fetch);
-      if( response.status < 200 || response.status > 299 ) {
-        logger.warn(`failed to send ${key} to dag`, 'status='+response.status+', body='+(await response.text()) );
-        await this.send(key, data, attempt);
-      }
-    } catch(e) {
-      logger.warn(`failed to send ${key} to dag`, e);
-      await this.send(key, data, attempt);
-    }
   }
 
 }

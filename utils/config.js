@@ -13,6 +13,14 @@ const KAFKA_COMPOSER_TASK_TOPICS = [
 
 const config = {
 
+  dags : {
+    maxRetry : 3
+  },
+
+  task : {
+    defaultExpire : parseInt(env.DEFAULT_TASK_EXPIRE || 60)
+  },
+
   graph : {
     file : env.ARGONAUT_GRAPH || '/etc/argonaut/graph.js'
   },

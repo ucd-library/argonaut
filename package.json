@@ -14,7 +14,9 @@
   "license": "ISC",
   "dependencies": {
     "@google-cloud/logging-bunyan": "^3.2.0",
+    "bunyan": "^1.8.15",
     "json-templates": "^4.2.0",
-    "node-fetch": "^3.1.0"
+    "node-fetch": "^3.1.0",
+    "redis": "^4.0.1"
   }
 }
