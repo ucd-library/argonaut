@@ -1,4 +1,4 @@
-import * as net from 'net';
+import net from 'net';
 const DELAY_TIME = 2500;
 
 /**
@@ -6,18 +6,17 @@ const DELAY_TIME = 2500;
  * @description promise resolves when TCP response is recieved on host/port
  * 
  * @param {String} host
- * @param {Number} port
  * @param {Number} delayTime Optional.  Time to wait between connect attempts.  Defaults
  * to 2.5s.
  * 
  * @returns {Promise}
  */
-export default function waitUntil(host, port, delayTime) {
+function waitUntil(host, port, delayTime) {
   if( !delayTime ) delayTime = DELAY_TIME;
   port = parseInt(port);
 
   return new Promise((resolve, reject) => {
-    attempt(host, port, delayTime, resolve);
+    setTimeout(() => attempt(host, port, delayTime, resolve), delayTime);
   });
 }
 
@@ -32,3 +31,5 @@ function attempt(host, port, delayTime, resolve) {
     client.destroy(); 
   });
 }
+
+export default waitUntil;
