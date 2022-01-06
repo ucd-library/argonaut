@@ -1,4 +1,4 @@
-import {logger, config, redis, StartDag} from '../utils/index.js';
+import {logger, config, redis, sendToSink} from '../utils/index.js';
 import Graph from './lib/graph.js';
 
 class Composer {
@@ -35,11 +35,20 @@ class Composer {
 
   runDependency(taskId, data) {
     let task = this.graph.getTask(taskId);
-    let key = renderKey(taskId, task.groupByKey, data);
 
-    if( task.filter ) {
+    // Nothing to group, just run task if match
+    if( !task.groupBy ) {
+      this.runSingleton(task, key, data);
+      return;
+    }
+
+    // get rendered group by key
+    let key = renderKey(taskId, task.groupBy, data);
+
+    // there is a where clause, check clause
+    if( task.where ) {
       // no op
-      if( task.filter(data) !== true ) {
+      if( await task.where(data) !== true ) {
         logger.debug(`key '${key}' is a noop`);
         return;
       }
@@ -58,18 +67,34 @@ class Composer {
       logger.debug(`key '${expire}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
     }
 
-    // check is task is ready send to dag
+    // check is task is ready send to sink
     if( task.ready(taskMsgArray) !== true ) {      
       return; // task is not ready
     }
 
-    // send to dag via HTTP API call
-    // TODO: support other mechanisms than HTTP (ex: kafka)
-    logger.debug(`key '${key}' is ready, sending to dag`);
-    await StartDag.http(task, key, taskMsgArray);
+    await this.send(task, key, taskMsgArray);
+  }
+
+  runSingleton(task, key, data) {
+    if( task.where ) {
+      // no op
+      if( task.where(data) !== true ) {
+        logger.debug(`key '${key}' is a noop`);
+        return;
+      }
+    }
+
+    await this.send(task, key, [data]);
+  }
+
+  async send(task, key, taskMsgArray) {
+    // send to sink via task supplied method.
+    // this will attempt maxRetry times before quiting
+    logger.debug(`key '${key}' is ready, sending to sink`);
+    await sendToSink(task, key, taskMsgArray);
 
     // cleanup 
-    logger.debug(`Cleaning up key '${key}''`);
+    logger.debug(`Cleaning up key '${key}'`);
     await redis.client.del(key);
   }
 

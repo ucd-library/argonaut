@@ -1,19 +1,9 @@
 const env = process.env;
 
-const KAFKA_COMPOSER_TOPICS = {
-  EXPIRED_JOINS : 'argonaut-expired-joins',
-  RESPONSES : 'argonaut-task-responses',
-  SOURCES : 'argonaut-sources'
-}
-const KAFKA_COMPOSER_TASK_TOPICS = [
-  KAFKA_COMPOSER_TOPICS.EXPIRED_JOINS,
-  KAFKA_COMPOSER_TOPICS.RESPONSES,
-  KAFKA_COMPOSER_TOPICS.SOURCES
-]
 
 const config = {
 
-  dags : {
+  sink : {
     maxRetry : 3
   },
 
@@ -39,16 +29,18 @@ const config = {
     host : env.KAFKA_HOST || 'kafka',
     port : env.KAFKA_PORT || '9092',
     groups : {
-      composer : {
-        id : 'argonaut-composer',
-        topics : KAFKA_COMPOSER_TASK_TOPICS
-      }
+      composer :  'argonaut-composer',
     },
-    topics : {
-      expiredJoins : KAFKA_COMPOSER_TOPICS.EXPIRED_JOINS,
-      responses : KAFKA_COMPOSER_TOPICS.RESPONSES,
-      sources : KAFKA_COMPOSER_TOPICS.SOURCES
+    topicDefaults : {
+      replicationFactor : 1
+      retention : parseInt(env.KAFKA_DEFAULT_TOPIC_RETENTION || 1000 * 60 * 60 * 24 * 7), // ms
+      partitions : parseInt(env.KAFKA_DEFAULT_TOPIC_PARITIONS || 10);
     }
+  },
+
+  zookeeper : {
+    host : env.ZOOKEEPER_HOST || 'zookeeper',
+    port : env.ZOOKEEPER_PORT || '2181'
   }
 }
 

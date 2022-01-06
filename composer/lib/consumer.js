@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import {Consumer, utils} from '@ucd-lib/node-kafka';
 import {logger, config, waitUntil} from '../../utils/index.js';
 import graph from './graph.js';
 
@@ -34,14 +35,13 @@ class Consumer extends EventEmitter {
 
     await this.kafkaConsumer.connect();
 
-    let customTopics = graph.getCustomTopics();
-    let allTopics = [...GROUP_KAFKA_CONFIG.topics, ...customTopics];
+    let topics = graph.getTopics().map(topic => topic.name);
 
-    logger.info('waiting for topics: ', allTopics);
-    await this.kafkaConsumer.waitForTopics(allTopics);
+    logger.info('waiting for topics: ', topics);
+    await this.kafkaConsumer.waitForTopics(topics);
     
-    logger.info('topics ready: ', GROUP_KAFKA_CONFIG.topics);
-    await this.kafkaConsumer.subscribe(GROUP_KAFKA_CONFIG.topics);
+    logger.info('topics ready, subscribing: ', topics);
+    await this.kafkaConsumer.subscribe(topics);
 
     this._listen();
   }
@@ -70,7 +70,7 @@ class Consumer extends EventEmitter {
     logger.debug(`handling kafka message: ${id}`);
 
     try {
-      let task = graph.getTask(topic);
+      let task = graph.getTaskFromTopic(topic);
 
       // handle custom decoder
       if( task && task.decoder ) {
@@ -78,19 +78,28 @@ class Consumer extends EventEmitter {
         let payloads = await task.decoder(msg.value);
         if( !Array.isArray(payloads) ) payloads = [payloads];
         payloads.forEach(payload => {
-          payload.msgId = id;
-          payload.task = topic;
-          this.emit('message', payload)
+          this.emit('message', {
+            msdId: id, 
+            taskId: task.id, 
+            payload
+          });
         });
 
       } else {
         let payload = JSON.parse(msg.value);
-        payload.msgId = id;
-        this.emit('message', payload);
+        this.emit('message', {
+          msdId: id, 
+          taskId: task.id, 
+          payload
+        });
       }
 
     } catch(e) {
-      logger.error(`failed to parse index payload. message: ${id}`, e.message, msg.value.toString('utf-8'));
+      logger.error(
+        `failed to parse index payload. message: ${id}`, 
+        e.message, 
+        msg.value.toString('utf-8').substring(0, 1000)
+      );
       return;
     }
 

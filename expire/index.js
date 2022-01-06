@@ -1,4 +1,4 @@
-import {logger, config, redis, StartDag} from '../utils/index.js';
+import {logger, config, redis, sendToSink} from '../utils/index.js';
 import Consumer from './lib/consumer.js';
 import {render as renderKey} from './lib/key-message.js';
 import Graph from './lib/graph.js';
@@ -30,8 +30,8 @@ class Expire {
 
     let task = this.graph.getTask(taskMsgArray[0].id);
 
-    logger.info(`key '${key}' is expired, sending to dag`);
-    await StartDag.http(task, key, taskMsgArray);
+    logger.info(`key '${key}' is expired, sending to sink`);
+    await sendToSink.http(task, key, taskMsgArray);
 
     // cleanup 
     logger.debug(`Cleaning up key '${key}''`);
@@ -40,4 +40,4 @@ class Expire {
 
 }
 
-export default Composer;
+export default Expire;
