@@ -1,8 +1,8 @@
 import redis from 'redis';
 import util from 'util';
-import config from '../utils/config.js';
-import logger from '../utils.logger.js';
-import waitUntil from '../utils/wait-until.js';
+import config from './config.js';
+import logger from './logger.js';
+import waitUntil from './wait-until.js';
 
 // commands we want to wrap in promises, feel free to add to this list
 const promisify = ['get', 'set', 'del', 'keys', 'expire', 'lpush', 'send_command', 'save'];

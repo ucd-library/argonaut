@@ -1,3 +1,4 @@
+import config from './config.js'
 
 class Graph {
 
@@ -6,13 +7,19 @@ class Graph {
     this.dependencies = {};
   }
 
-  load(file) {
+  async load(file) {
     this.graph = await import(file);
+    if( this.graph.default ) {
+      this.graph = this.graph.default;
+    }
     this.dependencies = {};
 
-    for( let key of this.graph ) {
+    for( let key in this.graph ) {
       this.graph[key].id = key;
-      for( let task of this.graph[key].dependsOn ) {
+
+      if( !this.graph[key].dependencies ) continue;
+
+      for( let task of this.graph[key].dependencies ) {
         if( !this.dependencies[task] ) this.dependencies[task] = [];
         this.dependencies[task].push(key);
       }
@@ -22,7 +29,7 @@ class Graph {
   getTopics() {
     let topics = [];
 
-    for( let key of this.graph ) {
+    for( let key in this.graph ) {
       let task = this.graph[key];
       let topic = task.topic || key;
 
@@ -30,7 +37,7 @@ class Graph {
         topic = {name : topic}
       }
 
-      for( let key of config.kafka.topicDefaults ) {
+      for( let key in config.kafka.topicDefaults ) {
         if( topic[key] === undefined ) {
           topic[key] = config.kafka.topicDefaults[key];
         }

@@ -1,18 +1,16 @@
-import {logger, config, redis, sendToSink} from '../utils/index.js';
+import {logger, config, redis, sendToSink, Graph} from '../utils/index.js';
 import Consumer from './lib/consumer.js';
 import {render as renderKey} from './lib/key-message.js';
-import Graph from './lib/graph.js';
 
 class Expire {
    
   constructor() {
     this.graph = new Graph();
-    this.graph.load(config.graph.file);
-
     this.redisEvents = new redis.RedisClient();
   }
 
   async connect() {
+    await this.graph.load(config.graph.file);
     await this.redisEvents.connect();
     await redis.connect();
 

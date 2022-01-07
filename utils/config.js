@@ -32,9 +32,9 @@ const config = {
       composer :  'argonaut-composer',
     },
     topicDefaults : {
-      replicationFactor : 1
+      replicationFactor : 1,
       retention : parseInt(env.KAFKA_DEFAULT_TOPIC_RETENTION || 1000 * 60 * 60 * 24 * 7), // ms
-      partitions : parseInt(env.KAFKA_DEFAULT_TOPIC_PARITIONS || 10);
+      partitions : parseInt(env.KAFKA_DEFAULT_TOPIC_PARITIONS || 10)
     }
   },
 

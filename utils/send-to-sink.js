@@ -1,7 +1,7 @@
-import config from '../config.js'
-import logger from '../logger.js'
+import config from './config.js'
+import logger from './logger.js'
 
-function send(task, key, data, attempt=0) {
+async function send(task, key, data, attempt=0) {
   let maxRetry = task.maxRetry !== undefined ? task.maxRetry : config.sink.maxRetry;
 
   attempt++;  

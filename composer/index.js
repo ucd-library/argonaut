@@ -1,18 +1,15 @@
-import {logger, config, redis, sendToSink} from '../utils/index.js';
-import Graph from './lib/graph.js';
+import {logger, config, redis, sendToSink, Graph} from '../utils/index.js';
 
 class Composer {
    
   constructor() {
     this.graph = new Graph();
-    this.graph.load(config.graph.file);
-
     this.consumer = new Consumer(this.graph);
-
     this.consumer.on('message', msg => this.onMessage(msg));
   }
 
   async connect() {
+    await this.graph.load(config.graph.file);
     await this.consumer.connect();
     await redis.connect();
   }

@@ -1,25 +1,26 @@
-import {logger, config, waitUntil} from '../utils/index.js';
-import Graph from './lib/graph.js';
+import {logger, config, waitUntil, Graph} from '../utils/index.js';
 import {exec} from 'child_process';
 
 class KafkaInit {
 
   constructor() {
     this.graph = new Graph();
-    this.graph.load(config.graph.file);
     this.shell = '/bin/bash';
   }
 
   async run() {
+    await this.graph.load(config.graph.file);
+
     logger.info('waiting for zookeeper and kafka');
 
     await waitUntil(config.zookeeper.host, config.zookeeper.port);
     await waitUntil(config.kafka.host, config.kafka.port);
 
     logger.info('initializing kafka topics');
-    let topics = graph.getTopics();
+    let topics = this.graph.getTopics();
 
     for( let topic of topics ) {
+      logger.debug('Ensuring topic and config: ', topic);
       await this.ensureTopic(topic);
       await this.ensureRetention(topic);
     }
