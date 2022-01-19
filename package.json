@@ -2,16 +2,16 @@
   "name": "@ucd-lib/argonaut",
   "version": "0.0.1",
   "description": "",
-  "main": "index.js",
+  "main": "utils/index.js",
   "type": "module",
   "directories": {
-    "lib": "lib"
+    "utils": "utils"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "jrmerz@ucdavis.edu",
+  "license": "MIT",
   "dependencies": {
     "@google-cloud/logging-bunyan": "^3.2.0",
     "@ucd-lib/node-kafka": "^0.0.8",

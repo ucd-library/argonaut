@@ -1,4 +1,4 @@
-import redis from 'redis';
+import {createClient} from 'redis';
 import util from 'util';
 import config from './config.js';
 import logger from './logger.js';
@@ -12,13 +12,15 @@ class RedisClient {
   async _initClient() {
     await waitUntil(config.redis.host, config.redis.port);
 
-    this.client = redis.createClient({
-      host: config.redis.host,
-      port : config.redis.port
+    this.client = createClient({
+      socket : {
+        host: config.redis.host,
+        port : config.redis.port
+      }
     });
 
     // Node Redis currently doesn't natively support promises (this is coming in v4)
-    promisify.forEach(key => this.client[key] = util.promisify(this.client[key]));
+    // promisify.forEach(key => this.client[key] = util.promisify(this.client[key]));
 
     this.client.on('error', (err) => {
       logger.error('Redis client error', err);
@@ -32,6 +34,8 @@ class RedisClient {
     this.client.on('reconnecting', () => {
       logger.info('Redis client reconnecting');
     });
+
+    await this.client.connect();
   }
 
   /**
@@ -75,6 +79,6 @@ class RedisClient {
 
 }
 
-let client = new RedisClient();
-client.RedisClient = RedisClient;
-export default client;
+let instance = new RedisClient();
+instance.RedisClient = RedisClient;
+export default instance;

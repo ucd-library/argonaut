@@ -25,6 +25,11 @@ const config = {
     serviceAccountFile: env.GOOGLE_APPLICATION_CREDENTIALS
   },
 
+  redis : {
+    host : env.REDIS_HOST || 'redis',
+    port : env.REDIS_PORT || '6379',
+  },
+
   kafka : {
     host : env.KAFKA_HOST || 'kafka',
     port : env.KAFKA_PORT || '9092',

@@ -1,6 +1,4 @@
 import {logger, config, redis, sendToSink, Graph} from '../utils/index.js';
-import Consumer from './lib/consumer.js';
-import {render as renderKey} from './lib/key-message.js';
 
 class Expire {
    

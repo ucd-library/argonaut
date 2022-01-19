@@ -1,22 +1,23 @@
 import {logger, config, redis, sendToSink, Graph} from '../utils/index.js';
+import Consumer from './lib/consumer.js';
+import {render as renderKey} from './lib/key-message.js';
 
 class Composer {
    
   constructor() {
     this.graph = new Graph();
-    this.consumer = new Consumer(this.graph);
-    this.consumer.on('message', msg => this.onMessage(msg));
+    this.consumer = new Consumer(this.graph, this.onMessage.bind(this));
   }
 
   async connect() {
     await this.graph.load(config.graph.file);
-    await this.consumer.connect();
     await redis.connect();
+    await this.consumer.connect();
   }
 
   async onMessage(msg) {
-    let id = msg.task;
-    let data = msg.data;
+    let id = msg.taskId;
+    let data = msg.payload;
     
     if( !id ) {
       logger.error(`Consumed message "${msg.msgId}" without a task identifier`);
@@ -30,12 +31,12 @@ class Composer {
     }
   }
 
-  runDependency(taskId, data) {
+  async runDependency(taskId, data) {
     let task = this.graph.getTask(taskId);
 
     // Nothing to group, just run task if match
     if( !task.groupBy ) {
-      this.runSingleton(task, key, data);
+      this.runSingleton(task, taskId, data);
       return;
     }
 
@@ -52,16 +53,16 @@ class Composer {
     }
 
     // push on key
-    await redis.client.lpush(key, JSON.stringify({id: taskId, data}));
+    await redis.client.lPush(key, JSON.stringify(data));
 
     // grab all messages form redis
-    let taskMsgArray = (await redis.client.get(key))
+    let taskMsgArray = (await redis.client.lRange(key, 0, -1))
       .map(item => JSON.parse(item));
 
     // if this was the first message, set to expire
     if( taskMsgArray.length === 1 ) {
-      redis.client.expire(key, task.expire || config.task.defaultExpire);
-      logger.debug(`key '${expire}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
+      await redis.client.expire(key, task.expire || config.task.defaultExpire);
+      logger.debug(`key '${key}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
     }
 
     // check is task is ready send to sink
@@ -72,11 +73,11 @@ class Composer {
     await this.send(task, key, taskMsgArray);
   }
 
-  runSingleton(task, key, data) {
+  async runSingleton(task, key, data) {
     if( task.where ) {
       // no op
       if( task.where(data) !== true ) {
-        logger.debug(`key '${key}' is a noop`);
+        logger.debug(`taskId '${key}' is a noop`);
         return;
       }
     }

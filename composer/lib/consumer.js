@@ -1,26 +1,30 @@
 import EventEmitter from 'events';
-import {Consumer, utils} from '@ucd-lib/node-kafka';
+import kafka from '@ucd-lib/node-kafka';
 import {logger, config, waitUntil} from '../../utils/index.js';
-import graph from './graph.js';
+
+const {Consumer, utils} = kafka;
 
 const GROUP_KAFKA_CONFIG = config.kafka.groups.composer;
 
 /**
- * @class Consumer
+ * @class A6tConsumer
  * @description
  */
-class Consumer extends EventEmitter {
+class A6tConsumer extends EventEmitter {
 
-  constructor(graph) {
+  constructor(graph, messageCallback) {
+    super();
     this.graph = graph;
 
-    this.kafkaConsumer = new kafka.Consumer({
+    this.kafkaConsumer = new Consumer({
       'group.id': GROUP_KAFKA_CONFIG.id,
       'metadata.broker.list': config.kafka.host+':'+config.kafka.port,
     },{
       // subscribe to front of committed offset
       'auto.offset.reset' : 'earliest'
     });
+
+    this.messageCallback = messageCallback;
   }
 
   /**
@@ -35,7 +39,7 @@ class Consumer extends EventEmitter {
 
     await this.kafkaConsumer.connect();
 
-    let topics = graph.getTopics().map(topic => topic.name);
+    let topics = this.graph.getTopics().map(topic => topic.name);
 
     logger.info('waiting for topics: ', topics);
     await this.kafkaConsumer.waitForTopics(topics);
@@ -70,24 +74,24 @@ class Consumer extends EventEmitter {
     logger.debug(`handling kafka message: ${id}`);
 
     try {
-      let task = graph.getTaskFromTopic(topic);
+      let task = this.graph.getTaskFromTopic(topic);
 
       // handle custom decoder
       if( task && task.decoder ) {
 
         let payloads = await task.decoder(msg.value);
         if( !Array.isArray(payloads) ) payloads = [payloads];
-        payloads.forEach(payload => {
-          this.emit('message', {
+        for( let payload of payloads ) {
+          await this.messageCallback({
             msdId: id, 
             taskId: task.id, 
             payload
           });
-        });
+        }
 
       } else {
         let payload = JSON.parse(msg.value);
-        this.emit('message', {
+        await this.messageCallback({
           msdId: id, 
           taskId: task.id, 
           payload
@@ -98,7 +102,8 @@ class Consumer extends EventEmitter {
       logger.error(
         `failed to parse index payload. message: ${id}`, 
         e.message, 
-        msg.value.toString('utf-8').substring(0, 1000)
+        e.stack,
+        msg.value.toString('utf-8').substring(0, 500)
       );
       return;
     }
@@ -107,4 +112,4 @@ class Consumer extends EventEmitter {
 
 }
 
-export default Consumer;
+export default A6tConsumer;
