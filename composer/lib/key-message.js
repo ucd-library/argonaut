@@ -1,22 +1,14 @@
-import jsonTemplates from "json-templates";
-
-const cache = {};
-
 /**
  * @function render
  * @description render the string template from message data
  * 
  * @param {String} taskId
- * @param {String} strTemplate 
- * @param {Object} data 
+ * @param {Function} strTemplate 
+ * @param {Object} msg 
  * @returns {String}
  */
-function render(taskId, strTemplate, data) {
-  if( !cache[strTemplate] ) {
-    cache[strTemplate] = jsonTemplates(strTemplate);
-  }
-
-  return taskId+'-'+cache[strTemplate](data);
+function render(taskId, strTemplate, msg) {
+  return taskId+'-'+strTemplate(msg);
 }
 
 export {render}

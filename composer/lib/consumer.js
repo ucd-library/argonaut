@@ -35,6 +35,7 @@ class A6tConsumer extends EventEmitter {
    * are stashed in redis that were never executed
    */
   async connect() {
+    logger.info(`waiting for kafka ${config.kafka.host}:${config.kafka.port}`);
     await waitUntil(config.kafka.host, config.kafka.port);
 
     await this.kafkaConsumer.connect();

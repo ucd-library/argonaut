@@ -66,7 +66,7 @@ class Composer {
     }
 
     // check is task is ready send to sink
-    if( task.ready(taskMsgArray) !== true ) {      
+    if( task.ready(key, taskMsgArray) !== true ) {      
       return; // task is not ready
     }
 
