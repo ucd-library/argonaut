@@ -1,12 +1,14 @@
 ARG KAFKA_IMAGE
+
 FROM ${KAFKA_IMAGE}
+ARG NODE_VERSION=17
 
 # base dependencies
 USER root
 RUN apt-get update && apt-get install -y wait-for-it vim curl build-essential
 
 # install nodejs
-RUN curl -fsSL https://deb.nodesource.com/setup_17.x | bash -
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
 RUN apt-get install -y nodejs
 
 RUN mkdir /service

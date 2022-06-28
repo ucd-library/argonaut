@@ -40,7 +40,7 @@ class A6tConsumer extends EventEmitter {
 
     await this.kafkaConsumer.connect();
 
-    let topics = this.graph.getTopics().map(topic => topic.name);
+    let topics = this.graph.getTopics();
 
     logger.info('waiting for topics: ', topics);
     await this.kafkaConsumer.waitForTopics(topics);
@@ -94,7 +94,7 @@ class A6tConsumer extends EventEmitter {
         let payload = JSON.parse(msg.value);
         await this.messageCallback({
           msdId: id, 
-          taskId: task.id, 
+          taskId: task ? task.id : topic, 
           payload
         });
       }

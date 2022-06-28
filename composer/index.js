@@ -10,7 +10,9 @@ class Composer {
   }
 
   async connect() {
+    logger.info('loading graph: '+config.graph.file);
     await this.graph.load(config.graph.file);
+    logger.info('Connecting to redis');
     await redis.connect();
     await this.consumer.connect();
   }
@@ -51,6 +53,10 @@ class Composer {
         return;
       }
     }
+
+    // we need locking on both array length check and 
+    // on send (so we don't send twice)
+    // https://github.com/mike-marcacci/node-redlock
 
     // push on key
     await redis.client.lPush(key, JSON.stringify(data));

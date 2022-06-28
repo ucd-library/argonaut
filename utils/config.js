@@ -1,5 +1,10 @@
 const env = process.env;
 
+// k8s inserts a kafka port like tcp://10.109.128.0:9092.  clean up
+let kafkaPort = env.KAFKA_PORT;
+if( kafkaPort && kafkaPort.match(/:/) ) {
+  kafkaPort = kafkaPort.split(':').pop();
+}
 
 const config = {
 
@@ -32,7 +37,7 @@ const config = {
 
   kafka : {
     host : env.KAFKA_HOST || 'kafka',
-    port : env.KAFKA_PORT || '9092',
+    port : kafkaPort || '9092',
     groups : {
       composer :  'argonaut-composer',
     },

@@ -21,6 +21,8 @@ A6T_REPO_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 # kafka init
 docker build \
   -t $A6T_IMAGE_NAME_TAG \
+  -t $A6T_IMAGE_NAME:$CONTAINER_CACHE_TAG \
+  --build-arg NODE_VERSION=${NODE_VERSION} \
   --build-arg KAFKA_IMAGE=${KAFKA_IMAGE_NAME_TAG} \
   --build-arg A6T_REPO_HASH=${A6T_REPO_HASH} \
   --build-arg A6T_REPO_TAG=${A6T_REPO_TAG} \

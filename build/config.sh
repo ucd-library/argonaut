@@ -28,12 +28,14 @@ KAFKA_TAG=2.5.0
 # Registery
 ##
 
-A6T_REG_HOST=gcr.io/ucdlib-pubreg
+if [[ -z $A6T_REG_HOST ]]; then
+  A6T_REG_HOST=gcr.io/ucdlib-pubreg
 
-# set local-dev tags used by 
-# local development docker-compose file
-if [[ ! -z $LOCAL_BUILD ]]; then
-  A6T_REG_HOST=localhost/local-dev
+  # set local-dev tags used by 
+  # local development docker-compose file
+  if [[ ! -z $LOCAL_DEV ]]; then
+    A6T_REG_HOST=localhost/local-dev
+  fi
 fi
 
 ##

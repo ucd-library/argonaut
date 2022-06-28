@@ -15,6 +15,7 @@ class Graph {
     this.dependencies = {};
 
     for( let key in this.graph ) {
+      if( this.graph[key].enabled === false ) continue;
       this.graph[key].id = key;
 
       if( !this.graph[key].dependencies ) continue;
@@ -27,26 +28,22 @@ class Graph {
   }
 
   getTopics() {
-    let topics = [];
+    let topics = new Set();
 
     for( let key in this.graph ) {
+      if( this.graph[key].enabled === false ) continue;
+
       let task = this.graph[key];
       let topic = task.topic || key;
 
-      if( typeof topic === 'string' ) {
-        topic = {name : topic}
-      }
+      topics.add(topic);
 
-      for( let key in config.kafka.topicDefaults ) {
-        if( topic[key] === undefined ) {
-          topic[key] = config.kafka.topicDefaults[key];
-        }
+      if( task.dependencies ) {
+        task.dependencies.forEach(topic => topics.add(topic));
       }
-
-      topics.push(topic);
     }
 
-    return topics;
+    return Array.from(topics);
   }
 
   getTask(id) {
