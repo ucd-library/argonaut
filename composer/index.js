@@ -1,6 +1,7 @@
 import {logger, config, redis, sendToSink, Graph} from '../utils/index.js';
 import Consumer from './lib/consumer.js';
 import {render as renderKey} from './lib/key-message.js';
+import RedisLock from '../utils/lock.js';
 
 class Composer {
    
@@ -15,6 +16,8 @@ class Composer {
     logger.info('Connecting to redis');
     await redis.connect();
     await this.consumer.connect();
+
+    this.redisLock = RedisLock(redis.client);
   }
 
   async onMessage(msg) {
@@ -25,6 +28,8 @@ class Composer {
       logger.error(`Consumed message "${msg.msgId}" without a task identifier`);
       return;
     }
+
+    logger.debug('Handling message', msg);
 
     // render the task key
     let dependencies = this.graph.getDependencies(id);
@@ -54,29 +59,49 @@ class Composer {
       }
     }
 
-    // we need locking on both array length check and 
-    // on send (so we don't send twice)
-    // https://github.com/mike-marcacci/node-redlock
-
     // push on key
-    await redis.client.lPush(key, JSON.stringify(data));
+    await redis.client.lpush(key, JSON.stringify({taskId, data}));
 
-    // grab all messages form redis
-    let taskMsgArray = (await redis.client.lRange(key, 0, -1))
-      .map(item => JSON.parse(item));
+    await this.checkReady(key, task);    
+  }
 
-    // if this was the first message, set to expire
-    if( taskMsgArray.length === 1 ) {
-      await redis.client.expire(key, task.expire || config.task.defaultExpire);
-      logger.debug(`key '${key}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
+  // we need locking on both array length check and 
+  // on send (so we don't send twice)
+  // https://github.com/mike-marcacci/node-redlock
+  async checkReady(key, task) {
+    let lock = await this.redisLock.acquire([key+'-lock'], 5000);
+
+    if( !await redis.client.exists(key) ) {
+      lock.unlock();
+      return;
     }
 
-    // check is task is ready send to sink
-    if( task.ready(key, taskMsgArray) !== true ) {      
-      return; // task is not ready
-    }
+    try {
+      // grab all messages form redis
+      let taskMsgArray = (await redis.client.lrange(key, 0, -1))
+        .map(item => JSON.parse(item));
 
-    await this.send(task, key, taskMsgArray);
+      // if recheck
+      if( !task ) {
+        task = this.graph.getTask(taskMsgArray[0].taskId);
+      }
+      taskMsgArray = taskMsgArray.map(item => item.data);
+
+      // if this was the first message, set to expire
+      if( taskMsgArray.length === 1 ) {
+        await redis.client.expire(key, task.expire || config.task.defaultExpire);
+        logger.debug(`key '${key}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
+      }
+
+      // check is task is ready send to sink
+      if( task.ready(key, taskMsgArray) !== true ) {   
+        return; // task is not ready
+      }
+
+      await this.send(task, key, taskMsgArray);
+    } finally {
+      lock.unlock();
+    }
   }
 
   async runSingleton(task, key, data) {

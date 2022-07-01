@@ -19,10 +19,13 @@ class A6tConsumer extends EventEmitter {
     this.kafkaConsumer = new Consumer({
       'group.id': GROUP_KAFKA_CONFIG.id,
       'metadata.broker.list': config.kafka.host+':'+config.kafka.port,
+      'enable.auto.commit': true
     },{
       // subscribe to front of committed offset
-      'auto.offset.reset' : 'earliest'
+      'auto.offset.reset' : 'earliest',
+      'enable.auto.commit': true
     });
+    this.kafkaConsumer.loopInterval = 50;
 
     this.messageCallback = messageCallback;
   }
