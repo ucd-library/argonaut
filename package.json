@@ -8,15 +8,16 @@
     "utils": "utils"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "expire": "node expire/instance.js",
+    "composer": "node composer/instance.js"
   },
   "author": "jrmerz@ucdavis.edu",
   "license": "MIT",
   "dependencies": {
     "@google-cloud/logging-bunyan": "^3.2.0",
-    "@ucd-lib/node-kafka": "^0.0.8",
     "bunyan": "^1.8.15",
     "ioredis": "^4.28.5",
+    "kafkajs": "^2.1.0",
     "node-fetch": "^3.1.0",
     "redlock": "^4.2.0"
   }

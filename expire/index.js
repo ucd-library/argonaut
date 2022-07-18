@@ -22,27 +22,31 @@ class Expire {
     await this.redisEvents.subscribe('__keyevent@0__:expired');
     this.redisEvents.on('message', (channel, key) => {
       if( channel !== '__keyevent@0__:expired' ) return;
-      this.sendKey(key);
+      if( !key.match(/-expire$/) ) return;
+      this.sendKey(key.replace(/-expire$/, ''));
     });
   }
 
   async sendKey(key) {
+    logger.debug(`key '${key}' is expired, acquiring lock`);
+
     let lock = await this.redisLock.acquire([key+'-lock'], 5000);
 
-    if( !await redis.client.exists(key) ) {
+    if( !(await redis.client.exists(key)) ) {
+      logger.debug(`expire key '${key}' was handled by someone else`);
       lock.unlock();
       return;
     }
 
     try {
 
-      let taskMsgArray = (await redis.client.get(key))
+      let taskMsgArray = (await redis.client.lrange(key, 0, -1))
         .map(item => JSON.parse(item));
 
       let task = this.graph.getTask(taskMsgArray[0].taskId);
       taskMsgArray = taskMsgArray.map(item => item.data);
 
-      logger.info(`key '${key}' is expired, sending to sink`);
+      logger.debug(`key '${key}' is expired, sending to sink`);
       await sendToSink(task, key, taskMsgArray);
 
       // cleanup 

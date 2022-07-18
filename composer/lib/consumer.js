@@ -1,10 +1,10 @@
 import EventEmitter from 'events';
-import kafka from '@ucd-lib/node-kafka';
-import {logger, config, waitUntil} from '../../utils/index.js';
+import {Kafka} from 'kafkajs';
+import {logger, config, waitUntil, waitForTopics} from '../../utils/index.js';
 
-const {Consumer, utils} = kafka;
-
-const GROUP_KAFKA_CONFIG = config.kafka.groups.composer;
+const kafka = new Kafka({
+  brokers: [config.kafka.host + ':' + config.kafka.port]
+});
 
 /**
  * @class A6tConsumer
@@ -16,16 +16,9 @@ class A6tConsumer extends EventEmitter {
     super();
     this.graph = graph;
 
-    this.kafkaConsumer = new Consumer({
-      'group.id': GROUP_KAFKA_CONFIG.id,
-      'metadata.broker.list': config.kafka.host+':'+config.kafka.port,
-      'enable.auto.commit': true
-    },{
-      // subscribe to front of committed offset
-      'auto.offset.reset' : 'earliest',
-      'enable.auto.commit': true
+    this.kafkaConsumer = kafka.consumer({
+      groupId : config.kafka.groups.composer
     });
-    this.kafkaConsumer.loopInterval = 50;
 
     this.messageCallback = messageCallback;
   }
@@ -46,10 +39,10 @@ class A6tConsumer extends EventEmitter {
     let topics = this.graph.getTopics();
 
     logger.info('waiting for topics: ', topics);
-    await this.kafkaConsumer.waitForTopics(topics);
+    await waitForTopics(topics);
     
     logger.info('topics ready, subscribing: ', topics);
-    await this.kafkaConsumer.subscribe(topics);
+    await this.kafkaConsumer.subscribe({topics});
 
     this._listen();
   }
@@ -60,7 +53,15 @@ class A6tConsumer extends EventEmitter {
    */
   async _listen() {
     try {
-      await this.kafkaConsumer.consume(msg => this._onMessage(msg));
+      await this.kafkaConsumer.run({
+        eachMessage: async ({topic, partition, message, heartbeat, pause}) => {
+          try {
+            await this._onMessage(message, topic, partition, message)
+          } catch(e) {
+            logger.error('kafka message error', e);
+          }
+        }
+      });
     } catch(e) {
       logger.error('kafka consume error', e);
     }
@@ -72,9 +73,8 @@ class A6tConsumer extends EventEmitter {
    * 
    * @param {Object} msg kafka message
    */
-  async _onMessage(msg) {
-    let id = kafka.utils.getMsgId(msg);
-    let topic = msg.topic;
+  async _onMessage(msg, topic, partition) {
+    let id = topic+':'+partition+':'+msg.offset;
     logger.debug(`handling kafka message: ${id}`);
 
     try {

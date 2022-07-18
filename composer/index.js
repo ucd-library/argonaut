@@ -87,9 +87,15 @@ class Composer {
       }
       taskMsgArray = taskMsgArray.map(item => item.data);
 
-      // if this was the first message, set to expire
+      // if this was the first message, set expire key
+      // this is required because you only get the key on the expire event
+      // so we need to store data in a non-expire key
       if( taskMsgArray.length === 1 ) {
-        await redis.client.expire(key, task.expire || config.task.defaultExpire);
+        await redis.client.set(key+'-expire', 1);
+        await redis.client.expire(key+'-expire', (task.expire || config.task.defaultExpire) * 1000);
+        // cleanup badness after 6 hours
+        // this should never happen
+        await redis.client.expire(key, 60*60*6); 
         logger.debug(`key '${key}' set to expire in: ${task.expire || config.task.defaultExpire}s`);
       }
 
@@ -124,6 +130,7 @@ class Composer {
 
     // cleanup 
     logger.debug(`Cleaning up key '${key}'`);
+    await redis.client.del(key+'-expire');
     await redis.client.del(key);
   }
 

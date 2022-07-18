@@ -22,7 +22,8 @@ VERION_TAG=v0.0.1-alpha${BUILD_NUM}
 # Repository tags/branchs
 # Tags should always be used for production deployments
 # Branches can be used for development deployments
-KAFKA_TAG=2.5.0
+# KAFKA_TAG=2.5.0
+NODE_VERSION=16
 
 ##
 # Registery
@@ -47,5 +48,5 @@ CONTAINER_CACHE_TAG="latest"
 A6T_IMAGE_NAME=$A6T_REG_HOST/argonaut
 A6T_IMAGE_NAME_TAG=$A6T_IMAGE_NAME:$VERION_TAG
 
-KAFKA_IMAGE_NAME=bitnami/kafka
-KAFKA_IMAGE_NAME_TAG=$KAFKA_IMAGE_NAME:$KAFKA_TAG
+# KAFKA_IMAGE_NAME=bitnami/kafka
+# KAFKA_IMAGE_NAME_TAG=$KAFKA_IMAGE_NAME:$KAFKA_TAG
