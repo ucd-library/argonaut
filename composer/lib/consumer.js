@@ -54,7 +54,7 @@ class A6tConsumer extends EventEmitter {
   async _listen() {
     try {
       await this.kafkaConsumer.run({
-        autoCommitInterval: 5000,
+        heartbeatInterval	: 10 * 1000,
         eachMessage: async ({topic, partition, message, heartbeat, pause}) => {
           try {
             await this._onMessage(message, topic, partition, message)
