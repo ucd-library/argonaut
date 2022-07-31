@@ -17,7 +17,8 @@ class A6tConsumer extends EventEmitter {
     this.graph = graph;
 
     this.kafkaConsumer = kafka.consumer({
-      groupId : config.kafka.groups.composer
+      groupId : config.kafka.groups.composer,
+      heartbeatInterval	: 10 * 1000
     });
 
     this.messageCallback = messageCallback;
